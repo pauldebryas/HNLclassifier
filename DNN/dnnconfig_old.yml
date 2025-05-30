@@ -1,7 +1,6 @@
-hidden_layer_configs: [[30,20,30]]
-save_folder: "simple_dnn_allperiods_odd"
-even_or_odd: 'odd'
-save_name: "DNN"
+hidden_layer_configs: [[20], [30,20,30], ]
+save_folder: "simple_dnn"
+save_name: "NAS3"
 scaler_filename: "scaler_FeatureSearch.pkl"
 selectionlonger: ['charge_1', 'charge_2', 'charge_3', 'pt_1',
        'pt_2', 'pt_3', 'pt_MET', 'eta_1', 'eta_2', 'eta_3', 'mass_1', 'mass_2',
@@ -23,20 +22,10 @@ selectionlonger: ['charge_1', 'charge_2', 'charge_3', 'pt_1',
        'W_CM_angle_to_plane_with_MET_2', 'HNL_CM_mass_1', 'HNL_CM_mass_2',
        'HNL_CM_mass_with_MET_1', 'HNL_CM_mass_with_MET_2', 'W_CM_angle_12',
        'W_CM_angle_13', 'W_CM_angle_23', 'W_CM_angle_1MET', 'W_CM_angle_2MET',
-       'W_CM_angle_3MET', 'signal_label','mass_hyp', 'weightNorm']
-model_info_list_name: "model_info_list"
-# data names
-saveName_data: 'multitrain_May28'
-tag: 'AddJETcorr'
-channels: 
-       - 'tee' 
-       - 'tem'
-       - 'tmm'
-       - 'tte'
-       - 'ttm'
-periods: 
-       - '2018'
-       - '2017'
-       - '2016'
-       - '2016_HIPM'
-#test_data_name: 'val2_AddJETcorr_2018_multitrain_Apr11'
+       'W_CM_angle_3MET', 'n_tauh', 'signal_label',
+       'mass_hyp', 'weightNorm']
+model_info_list_name: "model_info_list1"
+train_data_name: 'train_AddJETcorr_2018_singletrain_Feb19'
+val_data_name: 'val_AddJETcorr_2018_singletrain_Feb19'
+test_data_name: 'test_AddJETcorr_2018_singletrain_Feb19'
+

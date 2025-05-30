@@ -5,7 +5,7 @@ sys.path.append('../DNN/')
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from DD_data_extractor_git import Data_extractor_v4, output_vars_v4, flatten_2D_list
+from DD_data_extractor_git import Data_extractor_v5
 from copy import deepcopy
 import torch
 from tqdm import tqdm
@@ -22,7 +22,7 @@ from torch import load
 channel_mapping = {'tee': 0, 'tem': 1, 'tmm': 2, 'tte': 3, 'ttm': 4}
 renamed_old_input_names=['eta_1', 'mass_1', 'phi_1', 'pt_1', 'eta_2', 'mass_2', 'phi_2', 'pt_2', 'eta_3', 'mass_3', 'phi_3', 'pt_3', 'phi_MET', 'pt_MET']
 
-def process_dataframe(df, flat_features):
+def process_dataframe(df, flat_features, channel_map):
     channels_data = {}
     
 
@@ -31,7 +31,7 @@ def process_dataframe(df, flat_features):
     
 
     # Iterate over each unique channel name in the dictionary
-    for channel_name, channel_number in channel_mapping.items():
+    for channel_name, channel_number in channel_map.items():
         channel_data = {}
 
         # Filter the dataframe for the current channel
@@ -99,7 +99,7 @@ def process_channels(channels, flat_features, path, relative_path, data):
         # print(channel)
 
         # Initialize data extractor
-        extractor = Data_extractor_v4(channel)
+        extractor = Data_extractor_v5(channel)
 
         # Extract data
         data_dict4 = extractor(path+channel+relative_path, data=data)
@@ -745,7 +745,8 @@ def plot_average_significance_withpd(data, xvariables, model_info_df, binmakers,
                     pbar.set_description(f'Mass_hyps: {mass_hyp_value}, xvariable: {xvariable}, binmaker: {binmakertype}, model: {save_name}')
 
                     if xvariable == 'scores':
-                        sig_curr, uncer_curr = find_significance2(data, channels, xvariable, mass_hyp_value, save_name, model_class, save_path, input_vars, X=X, plot=False, scaler=scaler, binmakertype=binmakertype)
+                        sig_curr, uncer_curr = find_significance2(data, channels, xvariable, mass_hyp_value, model_class, input_vars, X=X, scaler=scaler, binmakertype=binmakertype)
+                        #sig_curr, uncer_curr = find_significance2(data, channels, xvariable, mass_hyp_value, save_name, model_class, save_path, input_vars, X=X, plot=False, scaler=scaler, binmakertype=binmakertype)
                     else:
                         sig_curr, uncer_curr = find_significance(data, channels, xvariable, mass_hyp_value, X=X, plot=False, binmakertype=binmakertype)
 
@@ -791,5 +792,195 @@ def plot_average_significance_withpd(data, xvariables, model_info_df, binmakers,
     # Adjust subplot parameters and then call tight_layout
     plt.subplots_adjust(bottom=-1)  # Adjust this value to suit your needs
     plt.tight_layout()
+
+    plt.show()
+
+
+
+
+
+
+
+def get_dnn_score_dict_torch_EvenOdd(data_dict_dnn, model_class, vars_list, masshyp, scaler=None):
+    dict_copy = deepcopy(data_dict_dnn)
+    vars_list_copy = vars_list.copy()
+    vars_list_copy.remove('signal_label')
+    vars_list_copy.remove('weightNorm')
+
+    model_even = model_class['even']
+    model_even.eval()
+
+    model_odd = model_class['odd']
+    model_odd.eval()
+
+    for channel in tqdm(dict_copy.keys(), desc='channel', disable=True):
+        data_background = pd.DataFrame.from_dict(dict_copy[channel]['background'])
+        data_signal = pd.DataFrame.from_dict(dict_copy[channel]['signal'])
+
+        data_background['mass_hyp'] = masshyp
+        data_signal['mass_hyp'] = masshyp
+
+        data_all = pd.concat([data_background, data_signal])
+        data_all = data_all.reset_index(drop=True)
+
+        even_df = data_all[data_all['event'] % 2 == 0]
+        odd_df = data_all[data_all['event'] % 2 == 1]
+
+        # Prepare features
+        even_data_np = even_df[vars_list_copy].to_numpy()
+        odd_data_np = odd_df[vars_list_copy].to_numpy()
+
+        if scaler and scaler.get('even') is not None:
+            even_data_np = scaler['even'].transform(even_data_np)
+        if scaler and scaler.get('odd') is not None:
+            odd_data_np = scaler['odd'].transform(odd_data_np)
+
+        even_tensor = torch.tensor(even_data_np).float()
+        odd_tensor = torch.tensor(odd_data_np).float()
+
+        # Use opposite model for scoring
+        with torch.no_grad():
+            scores_even = model_odd(even_tensor).numpy().flatten()
+            scores_odd = model_even(odd_tensor).numpy().flatten()
+
+        # Build a full score array in the same order as original concatenated data
+        scores_series = pd.Series(index=data_all.index, dtype=float)
+        scores_series.loc[even_df.index] = scores_even
+        scores_series.loc[odd_df.index] = scores_odd
+
+        # Split back into background and signal
+        n_bkg = len(data_background)
+        dict_copy[channel]['background']['scores'] = scores_series.iloc[:n_bkg].to_numpy()
+        dict_copy[channel]['signal']['scores'] = scores_series.iloc[n_bkg:].to_numpy()
+
+    return dict_copy
+
+def find_significanceEvenOdd(data, channels, xvariable, masshyp, model_class, vars_list, X=0.2, scaler=None, binmakertype='binmaker_rightleft', modeltype= 'dnn'):
+    #scaler
+    # model_class
+
+    significance_pd=pd.DataFrame(columns=channels)
+    uncertainty_pd=pd.DataFrame(columns=channels)
+
+
+    if modeltype=='dnn':
+        dnn_score_dict=get_dnn_score_dict_torch_EvenOdd(data,model_class, vars_list,masshyp, scaler=scaler)
+    
+    for channel in tqdm(channels, desc='channel find_significance2, masshyp:' + str(masshyp), disable=True):
+        try:
+            if binmakertype=='binmaker_rightleft':
+                bin_indices, signal_height, background_height, signal_error, background_error=binmaker_rightleft(dnn_score_dict[channel], xvariable, masshyp, X=X,  plot=False, Channelname =channel)
+            elif binmakertype == 'binmaker_constsignal':
+                bin_indices, signal_height, background_height, signal_error, background_error=binmaker(dnn_score_dict[channel], 30, xvariable, masshyp, X=X,  plot=False)
+            else:
+                raise ValueError("binmaker type not recognized: " + binmakertype)
+        except ValueError as ve:
+            print(f"Skipping binmaker for channel {channel} due to error: {str(ve)}")
+            continue
+        
+        s1 = signal_height / np.sqrt(background_height + 1e-8)  # Adding a small constant
+
+        significance2=np.sum(s1**2)
+        significance_pd.at[0, channel]=np.sqrt(significance2)  # Set value at specific cell
+
+        uncertainty=bin_uncertainty2(signal_height, background_height, signal_error, background_error, np.sqrt(significance2))
+        uncertainty_pd.at[0, channel]=uncertainty
+
+
+    return significance_pd, uncertainty_pd
+
+def plot_average_significance_withpd_evenOdd(data, xvariables, model_info_df, binmakertype, output_path_fig, X=0.3, hide_errorbars=False):
+
+    channels = data.keys()
+    mass_hyp_values = np.unique(data[list(channels)[0]]['signal']['mass_hyp'])
+
+    # Create separate axes for the legend
+    fig, ax = plt.subplots()
+    legend_ax = fig.add_axes([0, 0, 1, 0.1])
+
+    for xvariable in xvariables:
+        print(f'computing significance for {xvariable} var')
+        if xvariable == 'Mt_tot':
+            avg_scores = []
+            avg_uncertainties = []
+
+            pbar = tqdm(mass_hyp_values, disable=False)
+            for mass_hyp_value in pbar:
+                pbar.set_description(f'Mass_hyps: {mass_hyp_value}, xvariable: {xvariable}, binmaker: {binmakertype}')
+                sig_curr, uncer_curr = find_significance(data, channels, xvariable, mass_hyp_value, X=X, plot=False, binmakertype=binmakertype)
+
+                avg_score = sig_curr.mean(axis=1).values[0]
+                avg_uncertainty = uncer_curr.mean(axis=1).values[0]
+
+                avg_scores.append(avg_score)
+                avg_uncertainties.append(avg_uncertainty)
+
+            # Plot the average significance and its uncertainty
+            ax.plot(mass_hyp_values, avg_scores, label=f'Baseline: {xvariable} (with {binmakertype})')
+            if not hide_errorbars:
+                ax.fill_between(mass_hyp_values, np.subtract(avg_scores, avg_uncertainties), np.add(avg_scores, avg_uncertainties), alpha=0.2)
+        
+        else:
+            model_info_even =model_info_df['even'].iloc[0]
+            model_info_odd =model_info_df['odd'].iloc[0]
+
+            save_path_even, save_name_even, input_vars_even, hidden_layers_even, scaler_path_even = model_info_even['save_path'], model_info_even['save_name'], model_info_even['input_variables'], model_info_even['hidden_layers'], model_info_even['scaler_path']
+            save_path_odd, save_name_odd, input_vars_odd, hidden_layers_odd, scaler_path_odd = model_info_odd['save_path'], model_info_odd['save_name'], model_info_odd['input_variables'], model_info_odd['hidden_layers'], model_info_odd['scaler_path']
+
+            # Load model
+            model_class = {}
+            model_class['even'] = DNN_flexible(input_vars_even, hidden_layers_even)
+            model_class['odd'] = DNN_flexible(input_vars_odd, hidden_layers_odd)
+
+            model_class['even'].load_state_dict(load(save_path_even + save_name_even + '.pt'))
+            model_class['odd'].load_state_dict(load(save_path_odd + save_name_odd + '.pt'))
+
+            # Load scaler
+            scaler = {}
+            with open(scaler_path_even, 'rb') as f:
+                scaler['even'] = pickle.load(f)
+
+            # Load scaler
+            with open(scaler_path_odd, 'rb') as f:
+                scaler['odd'] = pickle.load(f)
+
+            avg_scores = []
+            avg_uncertainties = []
+
+            pbar = tqdm(mass_hyp_values, disable=False)
+            for mass_hyp_value in pbar:
+                pbar.set_description(f'Mass_hyps: {mass_hyp_value}, xvariable: {xvariable}, binmaker: {binmakertype}')
+
+                sig_curr, uncer_curr = find_significanceEvenOdd(data, channels, xvariable, mass_hyp_value, model_class, input_vars_even, X=X, scaler=scaler, binmakertype=binmakertype)
+
+                avg_score = sig_curr.mean(axis=1).values[0]
+                avg_uncertainty = uncer_curr.mean(axis=1).values[0]
+
+                avg_scores.append(avg_score)
+                avg_uncertainties.append(avg_uncertainty)
+
+            # Plot the average significance and its uncertainty
+            ax.plot(mass_hyp_values, avg_scores, label=f'DNN scores (with {binmakertype})')
+            if not hide_errorbars:
+                ax.fill_between(mass_hyp_values, np.subtract(avg_scores, avg_uncertainties), np.add(avg_scores, avg_uncertainties), alpha=0.2)
+
+    ax.set_xlabel('Mass hypothesis')
+    ax.set_ylabel('Average significance')
+    ax.set_title('Average significance vs mass hypothesis for different xvariables and binmakers')
+    ax.set_xscale('log')
+    ax.grid()
+    ax.set_yscale('log')
+
+    # handles, labels = ax.get_legend_handles_labels()
+    # legend_ax.legend(handles, labels, loc='upper left')
+    # Hide the axes of the legend
+    #legend_ax.axis('off')
+    ax.legend(loc='upper left')
+
+    # plt.grid()
+    # Adjust subplot parameters and then call tight_layout
+    plt.subplots_adjust(bottom=-1)  # Adjust this value to suit your needs
+    plt.tight_layout()
+    plt.savefig(output_path_fig)
 
     plt.show()

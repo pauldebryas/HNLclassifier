@@ -31,14 +31,6 @@ from kinematic_custom import *
 # import yaml
 
 # Global variables
-output_vars_v1 = ['event', 'genWeight', 'deltaR_12', 'deltaR_13', 'deltaR_23', 'pt_123', 'mt_12', 'mt_13', 'mt_23', 'Mt_tot', 'n_tauh']
-output_vars_v2 = ['event', 'genWeight', 'deltaphi_12', 'deltaphi_13', 'deltaphi_23', 'deltaeta_12', 'deltaeta_13', 'deltaeta_23', 
-                  'deltaR_12', 'deltaR_13', 'deltaR_23', 'pt_123', 'mt_12', 'mt_13', 'mt_23', 'Mt_tot', 'n_tauh']
-output_vars_v3 = ['event', 'genWeight', 'deltaphi_12', 'deltaphi_13', 'deltaphi_23', 'deltaeta_12', 'deltaeta_13', 'deltaeta_23',
-                   'deltaR_12', 'deltaR_13', 'deltaR_23', 'pt_123', 'mt_12', 'mt_13', 'mt_23', 'Mt_tot',
-                    ['HNL_CM_angle_with_MET_1', 'HNL_CM_angle_with_MET_2'], ['W_CM_angle_HNL_1', 'W_CM_angle_HNL_2'], 
-                    ['W_CM_angle_HNL_with_MET_1', 'W_CM_angle_HNL_with_MET_2'], ['HNL_CM_mass_1', 'HNL_CM_mass_2'],
-                    ['HNL_CM_mass_with_MET_1', 'HNL_CM_mass_with_MET_2'], 'n_tauh']
 output_vars_v4 = ['event', 'genWeight', 
                   'charge_1', 'charge_2', 'charge_3', 
                   'pt_1', 'pt_2', 'pt_3', 'pt_MET', 
@@ -68,7 +60,8 @@ output_vars_v4 = ['event', 'genWeight',
                   ['HNL_CM_mass_1', 'HNL_CM_mass_2'], 
 				  ['HNL_CM_mass_with_MET_1', 'HNL_CM_mass_with_MET_2'], 
                   ['W_CM_angle_12','W_CM_angle_13', 'W_CM_angle_23', 'W_CM_angle_1MET', 'W_CM_angle_2MET', 'W_CM_angle_3MET'],
-                  'n_tauh']
+                  #'n_tauh'
+                  ]
 
 output_vars_v5 = ['event', 'genWeight', 
                   'charge_1', 'charge_2', 'charge_3', 
@@ -99,7 +92,7 @@ output_vars_v5 = ['event', 'genWeight',
                   ['HNL_CM_mass_1', 'HNL_CM_mass_2', 'HNL_CM_mass_3'], 
 				  ['HNL_CM_mass_with_MET_1', 'HNL_CM_mass_with_MET_2', 'HNL_CM_mass_with_MET_3'], 
                   ['W_CM_angle_12','W_CM_angle_13', 'W_CM_angle_23', 'W_CM_angle_1MET', 'W_CM_angle_2MET', 'W_CM_angle_3MET'],
-                  'n_tauh',
+                  #'n_tauh',
                   ['px_1', 'py_1', 'pz_1', 'E_1', 'px_2', 'py_2', 'pz_2', 'E_2', 'px_3', 'py_3', 'pz_3', 'E_3'],
                   ['moth_mass_12', 'moth_mass_13', 'moth_mass_23', 'moth_pt_12', 'moth_pt_13', 'moth_pt_23', 'moth_eta_12', 'moth_eta_13', 'moth_eta_23', 'moth_phi_12', 'moth_phi_13', 'moth_phi_23', 'moth_px_12', 'moth_px_13', 'moth_px_23', 'moth_py_12', 'moth_py_13', 'moth_py_23', 'moth_pz_12', 'moth_pz_13', 'moth_pz_23', 'moth_E_12', 'moth_E_13', 'moth_E_23'],
                   'E_tot']
@@ -255,153 +248,85 @@ class Data_extractor():
             if self.channel == 'ttm':
                 cut = '(abs(Tau1_charge + Tau2_charge + Muon_charge) < {}) & (Tau1_idDeepTau2018v2p5VSjet >= {}) & (Tau2_idDeepTau2018v2p5VSjet >= {}) & (Muon_pfRelIso03_all < {})'.format(limit_charge, limit_tau_jet, limit_tau_jet, limit_em_iso)            
 
-            anatuple_before_cut = open(path+filename)['Event;1'].arrays(self.raw_vars, library='np') # type: ignore
-            weightsum_before_cut = anatuple_before_cut['genWeight'].sum()
-            weightsum1 += weightsum_before_cut
-            # print('weightsum before cut : ', weightsum_before_cut)
-            anatuple = open(path+filename)['Event;1'].arrays(self.raw_vars, cut=cut, library='np') # type: ignore
-            weightsum_after_cut = anatuple['genWeight'].sum()
-            weightsum2 += weightsum_after_cut
-            numsum2 += len(anatuple['genWeight'])
-
-            n = len(anatuple[list(anatuple.keys())[0]])
-
-            if n==0:
-                continue
-
-            anatuple['channel'] = [self.channel]*n
-
-
-            # Creation of the data
-            for i, var in enumerate(self.output_vars):
-                if self.functions[i] == None:
-                    data[var] = concatenate((data[var], anatuple[self.input_vars[i][0]]))
+            with open(path+filename) as file:
+                if len(file.keys()) == 0:
+                    print(f"The ROOT file {filename} is empty (no keys).")
                 else:
-                    outputs = self.functions[i](*call_dict_with_list(anatuple, self.input_vars[i]))
-                    if type(var) == list:
-                        for j,v in enumerate(var):
-                            data[v] = concatenate((data[v], outputs[j]))
-                    else:
-                        data[var] = concatenate((data[var], outputs))
+                    anatuple_before_cut = open(path+filename)['Events;1'].arrays(self.raw_vars, library='np') # type: ignore
+                    weightsum_before_cut = anatuple_before_cut['genWeight'].sum()
+                    weightsum1 += weightsum_before_cut
+                    # print('weightsum before cut : ', weightsum_before_cut)
+                    anatuple = open(path+filename)['Events;1'].arrays(self.raw_vars, cut=cut, library='np') # type: ignore
+                    weightsum_after_cut = anatuple['genWeight'].sum()
+                    weightsum2 += weightsum_after_cut
+                    numsum2 += len(anatuple['genWeight'])
 
-            label = 0
-            mass = ones((n,))
-            for prefix in signal_prefix:
-                if filename[:len(prefix)] == prefix:
-                    label = 1
+                    n = len(anatuple[list(anatuple.keys())[0]])
+
+                    if n==0:
+                        continue
+
+                    anatuple['channel'] = [self.channel]*n
+
+
+                    # Creation of the data
+                    for i, var in enumerate(self.output_vars):
+                        if self.functions[i] == None:
+                            data[var] = concatenate((data[var], anatuple[self.input_vars[i][0]]))
+                        else:
+                            outputs = self.functions[i](*call_dict_with_list(anatuple, self.input_vars[i]))
+                            if type(var) == list:
+                                for j,v in enumerate(var):
+                                    data[v] = concatenate((data[v], outputs[j]))
+                            else:
+                                data[var] = concatenate((data[var], outputs))
+
+                    label = 0
+                    mass = ones((n,))
+                    for prefix in signal_prefix:
+                        if filename[:len(prefix)] == prefix:
+                            label = 1
+                            if with_mass_hyp:
+                                mass *= isolate_int(filename,separators=['-', '_'])[0]
+                    if label == 0 and with_mass_hyp:
+                        mass = choice(mass_hyps, n)
+                    
+                    # Add mass hypothesis
                     if with_mass_hyp:
-                        mass *= isolate_int(filename,separators=['-', '_'])[0]
-            if label == 0 and with_mass_hyp:
-                mass = choice(mass_hyps, n)
-            
-            # Add mass hypothesis
-            if with_mass_hyp:
-                if 'mass_hyp' in data.keys():
-                    data['mass_hyp'] = concatenate((data['mass_hyp'], mass))
-                else:
-                    data['mass_hyp'] = mass
+                        if 'mass_hyp' in data.keys():
+                            data['mass_hyp'] = concatenate((data['mass_hyp'], mass))
+                        else:
+                            data['mass_hyp'] = mass
 
-            # Add signal label (by default)
-            if 'signal_label' in data.keys():
-                data['signal_label'] = concatenate((data['signal_label'], ones((n,))*label))
-            else:
-                data['signal_label'] = ones((n,))*label
+                    # Add signal label (by default)
+                    if 'signal_label' in data.keys():
+                        data['signal_label'] = concatenate((data['signal_label'], ones((n,))*label))
+                    else:
+                        data['signal_label'] = ones((n,))*label
 
-            # Add channel (by default)
-            if 'channel' in data.keys():
-                data['channel'].extend([self.channel]*n)
-            else:
-                data['channel'] = [self.channel]*n
+                    # Add channel (by default)
+                    if 'channel' in data.keys():
+                        data['channel'].extend([self.channel]*n)
+                    else:
+                        data['channel'] = [self.channel]*n
 
-            # Add event type (by default)
-            if 'event_type' in data.keys():
-                data['event_type'].extend([filename.replace('.root','')]*n)
-            else:
-                data['event_type'] = [filename.replace('.root','')]*n
-        
-        # print('weightsum before cut : ', weightsum1)
-        # print('weightsum after cut : ', weightsum2)
-        # print('numsum after cut : ', numsum2)
-        # weightsum= data['genWeight'].sum()
-        # print("weightsum = ", weightsum)
+                    # Add event type (by default)
+                    if 'event_type' in data.keys():
+                        data['event_type'].extend([filename.replace('.root','')]*n)
+                    else:
+                        data['event_type'] = [filename.replace('.root','')]*n
+                
+                # print('weightsum before cut : ', weightsum1)
+                # print('weightsum after cut : ', weightsum2)
+                # print('numsum after cut : ', numsum2)
+                # weightsum= data['genWeight'].sum()
+                # print("weightsum = ", weightsum)
  
 
 
         return data
     
 #===================================================================================================
-
-class Data_extractor_test(Data_extractor):
-    def __init__(self):
-        output_vars = ['test1', ['test_mix1', 'test_mix2'], 'test2']
-        functions = [None, lambda a : (a[0]*a[1], a[0]+a[1]), lambda a : 2*a]
-        raw_vars_general = ['test1', 'test2']
-        raw_vars_lepton1 = []
-        raw_vars_lepton2 = []
-        raw_vars_lepton3 = []
-        input_vars = [['test1'], ['test1', 'test2'], ['test2']]
-        super().__init__(channel='tte', raw_vars_general=raw_vars_general, raw_vars_lepton1=raw_vars_lepton1, raw_vars_lepton2=raw_vars_lepton2, 
-                         raw_vars_lepton3=raw_vars_lepton3, output_vars=output_vars, functions=functions, input_vars=input_vars, ) 
-
-        
-class Data_extractor_v1(Data_extractor):
-    def __init__(self, channel):
-        output_vars = deepcopy(output_vars_v1)
-        functions =[None, None, deltaR, deltaR, deltaR, sum_pt, transverse_mass, transverse_mass, transverse_mass, total_transverse_mass, count_tauh]
-        raw_vars_general = ['event', 'genWeight', 'MET_pt', 'MET_phi']
-        raw_vars_lepton1=['_eta', '_mass', '_phi', '_pt', '_genPartFlav']
-        raw_vars_lepton2=['_eta', '_mass', '_phi', '_pt', '_genPartFlav']
-        raw_vars_lepton3=['_eta', '_mass', '_phi', '_pt', '_genPartFlav']
-        input_vars = [['event'], ['genWeight'], ['1_eta', '2_eta', '1_phi', '2_phi'], ['1_eta', '3_eta', '1_phi', '3_phi'],
-                      ['2_eta', '3_eta', '2_phi', '3_phi'], [['1_pt', '2_pt', '3_pt'],['1_phi', '2_phi', '3_phi'],['1_eta', '2_eta', '3_eta'],
-                       ['1_mass', '2_mass', '3_mass']], ['1_pt', '2_pt', '1_phi', '2_phi'], ['1_pt', '3_pt', '1_phi', '3_phi'], 
-                       ['2_pt', '3_pt', '2_phi', '3_phi'], ['1_pt', '2_pt', '3_pt', 'MET_pt', '1_phi', '2_phi', '3_phi', 'MET_phi'], 
-                       ['channel', '1_genPartFlav', '2_genPartFlav', '3_genPartFlav']]
-        super().__init__(channel, raw_vars_general=raw_vars_general, raw_vars_lepton1=raw_vars_lepton1, raw_vars_lepton2=raw_vars_lepton2, 
-                         raw_vars_lepton3=raw_vars_lepton3, output_vars=output_vars, functions=functions, input_vars=input_vars)
-        
-class Data_extractor_v2(Data_extractor):
-    def __init__(self, channel):
-        output_vars = deepcopy(output_vars_v2)
-        functions =[None, None, deltaphi, deltaphi, deltaphi, deltaeta, deltaeta, deltaeta, deltaR, deltaR, deltaR, sum_pt, transverse_mass, transverse_mass, transverse_mass, total_transverse_mass, count_tauh]
-        raw_vars_general = ['event', 'genWeight', 'MET_pt', 'MET_phi']
-        raw_vars_lepton1=['_eta', '_mass', '_phi', '_pt', '_genPartFlav']
-        raw_vars_lepton2=['_eta', '_mass', '_phi', '_pt', '_genPartFlav']
-        raw_vars_lepton3=['_eta', '_mass', '_phi', '_pt', '_genPartFlav']
-        input_vars = [['event'], ['genWeight'], ['1_phi', '2_phi'], ['1_phi', '3_phi'], ['2_phi', '3_phi'], ['1_eta', '2_eta'], 
-                      ['1_eta', '3_eta'], ['2_eta', '3_eta'], ['1_eta', '2_eta', '1_phi', '2_phi'], ['1_eta', '3_eta', '1_phi', '3_phi'],
-                      ['2_eta', '3_eta', '2_phi', '3_phi'], [['1_pt', '2_pt', '3_pt'],['1_phi', '2_phi', '3_phi'],['1_eta', '2_eta', '3_eta'],
-                       ['1_mass', '2_mass', '3_mass']], ['1_pt', '2_pt', '1_phi', '2_phi'], ['1_pt', '3_pt', '1_phi', '3_phi'], 
-                      ['2_pt', '3_pt', '2_phi', '3_phi'], ['1_pt', '2_pt', '3_pt', 'MET_pt', '1_phi', '2_phi', '3_phi', 'MET_phi'], 
-                      ['channel', '1_genPartFlav', '2_genPartFlav', '3_genPartFlav']]
-        super().__init__(channel, raw_vars_general=raw_vars_general, raw_vars_lepton1=raw_vars_lepton1, raw_vars_lepton2=raw_vars_lepton2, 
-                         raw_vars_lepton3=raw_vars_lepton3, output_vars=output_vars, functions=functions, input_vars=input_vars)
-        
-class Data_extractor_v3(Data_extractor):
-    def __init__(self, channel):
-        output_vars = deepcopy(output_vars_v3)
-        functions =[None, None, deltaphi, deltaphi, deltaphi, deltaeta, deltaeta, deltaeta, deltaR, deltaR, deltaR, sum_pt, transverse_mass,
-                     transverse_mass, transverse_mass, total_transverse_mass, HNL_CM_angles_with_MET, W_CM_angles_to_plane, 
-                     W_CM_angles_to_plane_with_MET, HNL_CM_masses, HNL_CM_masses_with_MET, count_tauh]
-        raw_vars_general = ['event', 'genWeight', 'MET_pt', 'MET_phi']
-        lepton_specific = ['_eta', '_mass', '_phi', '_pt', '_charge', '_genPartFlav']
-        raw_vars_lepton1 = lepton_specific
-        raw_vars_lepton2 = lepton_specific
-        raw_vars_lepton3 = lepton_specific
-        input_vars = [['event'], ['genWeight'], ['1_phi', '2_phi'], ['1_phi', '3_phi'], ['2_phi', '3_phi'], ['1_eta', '2_eta'], 
-                      ['1_eta', '3_eta'], ['2_eta', '3_eta'], ['1_eta', '2_eta', '1_phi', '2_phi'], ['1_eta', '3_eta', '1_phi', '3_phi'],
-                      ['2_eta', '3_eta', '2_phi', '3_phi'], [['1_pt', '2_pt', '3_pt'],['1_phi', '2_phi', '3_phi'],['1_eta', '2_eta', '3_eta'],
-                       ['1_mass', '2_mass', '3_mass']], ['1_pt', '2_pt', '1_phi', '2_phi'], ['1_pt', '3_pt', '1_phi', '3_phi'], 
-                      ['2_pt', '3_pt', '2_phi', '3_phi'], ['1_pt', '2_pt', '3_pt', 'MET_pt', '1_phi', '2_phi', '3_phi', 'MET_phi'],
-                      ['1_charge', '2_charge', '3_charge', '1_pt', '2_pt', '3_pt', 'MET_pt', '1_phi', '2_phi', '3_phi', 'MET_phi', '1_eta', '2_eta', '3_eta', '1_mass', '2_mass', '3_mass'],
-                      ['1_charge', '2_charge', '3_charge', '1_pt', '2_pt', '3_pt', '1_phi', '2_phi', '3_phi', '1_eta', '2_eta', '3_eta', '1_mass', '2_mass', '3_mass'], 
-                      ['1_charge', '2_charge', '3_charge', '1_pt', '2_pt', '3_pt', 'MET_pt', '1_phi', '2_phi', '3_phi', 'MET_phi', '1_eta', '2_eta', '3_eta', '1_mass', '2_mass', '3_mass'],
-                      ['1_charge', '2_charge', '3_charge', '1_pt', '2_pt', '3_pt', '1_phi', '2_phi', '3_phi', '1_eta', '2_eta', '3_eta', '1_mass', '2_mass', '3_mass'], 
-                      ['1_charge', '2_charge', '3_charge', '1_pt', '2_pt', '3_pt', 'MET_pt', '1_phi', '2_phi', '3_phi', 'MET_phi', '1_eta', '2_eta', '3_eta', '1_mass', '2_mass', '3_mass'],
-                      ['channel', '1_genPartFlav', '2_genPartFlav', '3_genPartFlav']]
-        super().__init__(channel, raw_vars_general=raw_vars_general, raw_vars_lepton1=raw_vars_lepton1, raw_vars_lepton2=raw_vars_lepton2, 
-                         raw_vars_lepton3=raw_vars_lepton3, output_vars=output_vars, functions=functions, input_vars=input_vars)
-        
 
 class Data_extractor_v4(Data_extractor):
     def __init__(self, channel):
@@ -430,10 +355,11 @@ class Data_extractor_v4(Data_extractor):
                     W_CM_angles_to_plane, W_CM_angles_to_plane_with_MET,
 			        HNL_CM_masses,
                     HNL_CM_masses_with_MET, 
-                    W_CM_angles,
-                    count_tauh]
+                    W_CM_angles
+                    #count_tauh
+                    ]
         raw_vars_general = ['event', 'genWeight', 'MET_pt', 'MET_phi']
-        lepton_specific = ['_eta', '_mass', '_phi', '_pt', '_charge', '_genPartFlav']
+        lepton_specific = ['_eta', '_mass', '_phi', '_pt', '_charge']#, '_genPartFlav']
         raw_vars_lepton1 = lepton_specific
         raw_vars_lepton2 = lepton_specific
         raw_vars_lepton3 = lepton_specific
@@ -461,8 +387,9 @@ class Data_extractor_v4(Data_extractor):
 			        ['1_charge', '2_charge', '3_charge', '1_pt', '2_pt', '3_pt', '1_phi', '2_phi', '3_phi', '1_eta', '2_eta', '3_eta', '1_mass', '2_mass', '3_mass'], ['1_charge', '2_charge', '3_charge', '1_pt', '2_pt', '3_pt', 'MET_pt', '1_phi', '2_phi', '3_phi', 'MET_phi', '1_eta', '2_eta', '3_eta', '1_mass', '2_mass', '3_mass'],
 			        ['1_charge', '2_charge', '3_charge', '1_pt', '2_pt', '3_pt', '1_phi', '2_phi', '3_phi', '1_eta', '2_eta', '3_eta', '1_mass', '2_mass', '3_mass'], 
 			        ['1_charge', '2_charge', '3_charge', '1_pt', '2_pt', '3_pt', 'MET_pt', '1_phi', '2_phi', '3_phi', 'MET_phi', '1_eta', '2_eta', '3_eta', '1_mass', '2_mass', '3_mass'],
-			        ['1_pt', '2_pt', '3_pt', 'MET_pt', '1_phi', '2_phi', '3_phi', 'MET_phi', '1_eta', '2_eta', '3_eta', '1_mass', '2_mass', '3_mass'],
-			        ['channel', '1_genPartFlav', '2_genPartFlav', '3_genPartFlav']]
+			        ['1_pt', '2_pt', '3_pt', 'MET_pt', '1_phi', '2_phi', '3_phi', 'MET_phi', '1_eta', '2_eta', '3_eta', '1_mass', '2_mass', '3_mass']
+			        #['channel', '1_genPartFlav', '2_genPartFlav', '3_genPartFlav']
+                    ]
         super().__init__(channel, raw_vars_general=raw_vars_general, raw_vars_lepton1=raw_vars_lepton1, raw_vars_lepton2=raw_vars_lepton2, 
                          raw_vars_lepton3=raw_vars_lepton3, output_vars=output_vars, functions=functions, input_vars=input_vars)
 
@@ -494,12 +421,12 @@ class Data_extractor_v5(Data_extractor):
 			        HNL_CM_masses,
                     HNL_CM_masses_with_MET, 
                     W_CM_angles,
-                    count_tauh,
+                    #count_tauh,
                     p4calc,
                     motherpair_vals,
                     Energy_tot]
         raw_vars_general = ['event', 'genWeight', 'MET_pt', 'MET_phi']
-        lepton_specific = ['_eta', '_mass', '_phi', '_pt', '_charge', '_genPartFlav']
+        lepton_specific = ['_eta', '_mass', '_phi', '_pt', '_charge'] #, '_genPartFlav'
         raw_vars_lepton1 = lepton_specific
         raw_vars_lepton2 = lepton_specific
         raw_vars_lepton3 = lepton_specific
@@ -528,7 +455,7 @@ class Data_extractor_v5(Data_extractor):
 			        [ '1_pt', '2_pt', '3_pt', '1_phi', '2_phi', '3_phi', '1_eta', '2_eta', '3_eta', '1_mass', '2_mass', '3_mass'], 
 			        [ '1_pt', '2_pt', '3_pt', 'MET_pt', '1_phi', '2_phi', '3_phi', 'MET_phi', '1_eta', '2_eta', '3_eta', '1_mass', '2_mass', '3_mass'],
 			        ['1_pt', '2_pt', '3_pt', 'MET_pt', '1_phi', '2_phi', '3_phi', 'MET_phi', '1_eta', '2_eta', '3_eta', '1_mass', '2_mass', '3_mass'],
-			        ['channel', '1_genPartFlav', '2_genPartFlav', '3_genPartFlav'],
+			        #['channel', '1_genPartFlav', '2_genPartFlav', '3_genPartFlav'],
                     ['1_pt', '2_pt', '3_pt', '1_phi', '2_phi', '3_phi', '1_eta', '2_eta', '3_eta', '1_mass', '2_mass', '3_mass'],
                     ['1_pt', '2_pt', '3_pt', '1_phi', '2_phi', '3_phi', '1_eta', '2_eta', '3_eta', '1_mass', '2_mass', '3_mass'],
                     ['1_pt', '2_pt', '3_pt', '1_phi', '2_phi', '3_phi', '1_eta', '2_eta', '3_eta', '1_mass', '2_mass', '3_mass', 'MET_pt']
@@ -536,6 +463,7 @@ class Data_extractor_v5(Data_extractor):
         super().__init__(channel, raw_vars_general=raw_vars_general, raw_vars_lepton1=raw_vars_lepton1, raw_vars_lepton2=raw_vars_lepton2, 
                          raw_vars_lepton3=raw_vars_lepton3, output_vars=output_vars, functions=functions, input_vars=input_vars)
 
+#===================================================================================================
 
 class Data_generator():
     def __init__(self, numevents, normalize=False):
@@ -853,13 +781,7 @@ class Data_generator():
         for i, feat in enumerate(feat_toadd):
             self.data[feat] = outlier_normalization(self.data['pt_1'], self.data['pt_2'], self.data['pt_3'], self.data['pt_MET'], self.data[feat_orig[i]])
         return
-# def inverted_exponential_cdf(p, lambd, c):
-#     """Inverted exponential cumulative distribution function."""
-#     a = 0
-#     b = 10
-#     while np.sign(exponential_cdf(a, lambd, c) - p) == np.sign(exponential_cdf(b, lambd, c) - p):
-#         b *= 2
-#     return brentq(lambda x: exponential_cdf(x, lambd, c) - p, a, b)
+
 def inverted_exponential_cdf(p, lambd, c):
     """Inverted exponential cumulative distribution function."""
     # return (-np.log(1 - p) - c) / lambd
@@ -870,7 +792,6 @@ def generate_random_data( lambd, c):
     p = np.random.uniform(0, 1)
 
     return inverted_exponential_cdf(p, lambd, c)
-
         
 def exponential_cdf(x, lambd,c):
     """The exponential cumulative distribution function."""
@@ -879,7 +800,6 @@ def exponential_cdf(x, lambd,c):
 def outlier_normalization(Pt_1,Pt_2, Pt_3, MET, Xvar):
     Psum=np.sum([Pt_1,Pt_2, Pt_3, MET])
     return Xvar/Psum
-
 
 def remove_outliers(data, feature_name, limits):
     feature_limits = limits.get(feature_name)
@@ -908,7 +828,6 @@ def flatten_2D_list(multi_dim_list):
         else:
             new_list.append([ele])
     return reduce(iconcat, new_list, [])
-
 
 def normalize(dataframe, key, sum, weight_name='genWeight'):
     classes = dataframe[key].unique()
@@ -949,6 +868,41 @@ def bucketize(dataframe, key, return_dict = True):
         output = output.to_dict()
     
     if return_dict : 
+        return output, class_names
+    return output
+
+def bucketize_new(dataframe, key, class_names_dict=None, return_dict=True):
+    """
+    Input:
+        - dataframe : pandas DataFrame or dictionary
+        - key : column name representing the classes (to convert to indices)
+        - class_names_dict : optional dict mapping class names to integer indices
+        - return_dict : if True, returns the mapping used for encoding
+
+    Output:
+        - output : dataframe with integers replacing the values of dataframe[key]
+        - class_names : dictionary linking class names to their integer indices
+    """
+    dictionary = False
+    if isinstance(dataframe, dict):
+        dictionary = True
+        dataframe = pd.DataFrame(dataframe)
+
+    # Use provided mapping or generate one
+    if class_names_dict is not None:
+        class_names = class_names_dict
+    else:
+        unique_classes = dataframe[key].unique()
+        class_names = {name: idx for idx, name in enumerate(unique_classes)}
+
+    # Replace class names with indices
+    output = dataframe.copy()
+    output[key] = output[key].replace(class_names)
+
+    if dictionary:
+        output = output.to_dict()
+
+    if return_dict:
         return output, class_names
     return output
 
@@ -1007,8 +961,6 @@ def replace_prefix_in_list(list_, to_replace, replace_by):
             sublist.append(replace_prefix_in_list(el, to_replace, replace_by))
         return sublist
     
-
-
 def isolate_int(string, separators):
     if type(separators) != list:
        separators = [separators]
@@ -1066,7 +1018,6 @@ def RandomGenerate_count_tauh(genPartFlavs_1, genPartFlavs_2, genPartFlavs_3):
         n_tauh = n_tauh.tolist()
     
     return n_tauh 
-
 
 def split_dataset(data, ratio_train = 0.75, shuffle = True, print_sizes = True):
     """
@@ -1138,7 +1089,6 @@ def split_dataset2(data, ratio_train = 0.5, ratio_val = 0.1, shuffle = True, pri
 
     return data_train, data_val, data_test
 
-
 def split_dataset_multitrain(data, ratio_train1=0.4, ratio_train2=0.4, ratio_val1=0.1, ratio_val2=0.1, shuffle=True, print_sizes=True):
     """
     Input : 
@@ -1179,4 +1129,43 @@ def split_dataset_multitrain(data, ratio_train1=0.4, ratio_train2=0.4, ratio_val
         print("Validation1 set: {:.2f} %".format(100*len(data_val1)/N))
         print("Validation2 set: {:.2f} %".format(100*len(data_val2)/N))
         
+    return data_train1, data_train2, data_val1, data_val2
+
+def split_dataset_OddEven(data, ratio_val=0.2, print_sizes=True):
+    """
+    Splits the dataset into training and validation sets, separated by even and odd event numbers.
+
+    Input:
+        - data: dictionary containing the variables of interest for each event
+        - ratio_val: fraction of events (per even/odd group) used for validation
+        - print_sizes: if True, prints dataset sizes
+
+    Output:
+        - data_train1: training dataset from even events
+        - data_train2: training dataset from odd events
+        - data_val1: validation dataset from even events
+        - data_val2: validation dataset from odd events
+    """
+
+    df = DataFrame.from_dict(data)
+    N = len(df)
+
+    even_df = df[df['event'] % 2 == 0]
+    odd_df = df[df['event'] % 2 == 1]
+
+    # Split even events
+    data_train1 = even_df.sample(frac=(1 - ratio_val))
+    data_val1 = even_df.drop(data_train1.index)
+
+    # Split odd events
+    data_train2 = odd_df.sample(frac=(1 - ratio_val))
+    data_val2 = odd_df.drop(data_train2.index)
+
+    if print_sizes:
+        print("Total number of events:", N)
+        print("Train1 set (even): {:.2f} %".format(100 * len(data_train1) / N))
+        print("Train2 set (odd): {:.2f} %".format(100 * len(data_train2) / N))
+        print("Validation1 set (even): {:.2f} %".format(100 * len(data_val1) / N))
+        print("Validation2 set (odd): {:.2f} %".format(100 * len(data_val2) / N))
+
     return data_train1, data_train2, data_val1, data_val2

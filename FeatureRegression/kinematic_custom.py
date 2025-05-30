@@ -427,7 +427,7 @@ def W_CM_angles_to_plane(
         vector_j = vector_j.boostCM_of_p4(vector_tot)
         vector_first = vector_first.boostCM_of_p4(vector_tot)
         
-        normal = vector_i.cross(vector_j)
+        normal = vector_i.to_Vector3D().cross(vector_j.to_Vector3D())
         angle = vector_first.deltaangle(normal)
         
         angles.append(abs(pi / 2 - angle))
@@ -485,7 +485,7 @@ def W_CM_angles_to_plane_with_MET(
         vector_j = vector_j.boostCM_of_p4(vector_tot)
         vector_first = vector_first.boostCM_of_p4(vector_tot)
         
-        normal = vector_i.cross(vector_j)
+        normal = vector_i.to_Vector3D().cross(vector_j.to_Vector3D())
         angle = vector_first.deltaangle(normal)
         
         angles.append(abs(pi / 2 - angle))
